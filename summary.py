@@ -1,0 +1,74 @@
+from modal import App, Image, Volume
+
+NUM_CPU=16
+MAX_TOKENS = 500
+OVERLAP = 0.1 # 10% overlap when chunking
+
+# We first set out configuration variables for our script.
+DATASET_DIR = "/data"
+DATASET_NAME = "HuggingFaceFW/fineweb-edu"
+# DATASET_FILES = "sample/10BT/*.parquet"
+DATASET_SAVE ="fineweb-edu-sample-10BT"
+DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}"
+
+# MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
+
+# We define our Modal Resources that we'll need
+volume = Volume.from_name("embedding-fineweb-edu", create_if_missing=True)
+image = Image.debian_slim(python_version="3.9").pip_install(
+    "datasets==2.16.1", "apache_beam==2.53.0", "transformers", "pandas", "tqdm"
+)
+app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
+
+
+
+@app.function(cpu=NUM_CPU, volumes={DATASET_DIR: volume}, timeout=3000)
+def process_dataset(file):
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from tqdm import tqdm
+    import pandas as pd
+  
+    # Load the dataset as a Hugging Face dataset
+    # print(f"Loading dataset from {DATASET_DIR}/{DATASET_SAVE}/train/{file}")
+    df = pd.read_parquet(f"{DATASET_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
+    print("dataset", len(df))
+
+    return {
+        "file": file,
+        "num_rows": len(df),
+        "tokens": df["chunk_token_count"].sum(),
+        "less2": df[df["chunk_token_count"] < 2].shape[0],
+        "less10": df[df["chunk_token_count"] < 10].shape[0],
+        "less50": df[df["chunk_token_count"] < 50].shape[0],
+    }
+
+@app.local_entrypoint()
+def main():
+    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+    responses = []
+    for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):
+        if isinstance(resp, Exception):
+            print(f"Exception: {resp}")
+            continue
+        print(resp)
+        responses.append(resp)
+
+    total_rows = 0
+    total_tokens = 0
+    total_less2 = 0
+    total_less10 = 0
+    total_less50 = 0
+    for resp in responses:
+        total_rows += resp['num_rows']
+        total_tokens += resp['tokens']
+        total_less2 += resp['less2']
+        total_less10 += resp['less10']
+        total_less50 += resp['less50']
+    print(f"Total rows processed: {total_rows}")
+    print(f"Total tokens processed: {total_tokens}")
+    print(f"Total less2: {total_less2}")
+    print(f"Total less10: {total_less10}")
+    print(f"Total less50: {total_less50}")
+
+

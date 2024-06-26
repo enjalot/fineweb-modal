@@ -2,10 +2,12 @@
 
 This repository is a set of scripts used to process and embed a sample of the [FineWeb-edu dataset](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) using on-demand infrastructure via [Modal](https://modal.com).
 
-The first resulting dataset has been published at [this HuggingFace dataset](https://huggingface.co/datasets/enjalot/fineweb-edu-sample-10BT-chunked-500-nomic-text-v1.5).
+The first resulting dataset published is [FineWeb-edu 10BT Sample embedded with nomic-text-v1.5](https://huggingface.co/datasets/enjalot/fineweb-edu-sample-10BT-chunked-500-nomic-text-v1.5).
 
 All of these scripts have been developed as part of my learning process to scale up my capacity for embedding large datasets. 
 As such they aren't immediately generalizable but can be treated as a reference implementation. A lot of it is adapted from the [Embedding Wikipedia](https://modal.com/blog/embedding-wikipedia) tutorial.
+
+I am hoping to improve this process and use it to scale up to the 100BT next. If I can get a compute sponsor I'll then take it to the entire 1.4 trillion token dataset.
 
 
 ## Process
