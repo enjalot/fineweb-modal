@@ -12,10 +12,10 @@ I am hoping to improve this process and use it to scale up to the 100BT next. If
 
 ## Process
 
-### download.py
+### [download.py](download.py)
 To start with, we need to download the HF dataset to a volume in Modal. This is relatively straight forward and easy to change to a different dataset.
 
-### chunker.py
+### [chunker.py](chunker.py)
 I wanted to pre-chunk my dataset since tokenizing is relatively CPU intensive and my initial experiments with the tutorial code we bottlenecked by the chunking process. I also wanted to use actual token counts and analyze the impact of chunking on the dataset.
 
 I found that the 9.6 million documents in the 10BT sample turned into ~25 million chunks with 10.5 billion tokens due to the 10% overlap I chose. There is an issue in the chunking code right now that I will fix soon where chunks <= 50 tokens are created even though they represent pure overlap and aren't needed.
@@ -24,15 +24,15 @@ I based everything on files in the dataset, so the 10BT sample was 99 arrow file
 
 The chunking process took ~40 minutes using 100 containers and cost $5.
 
-### embed-tei.py
+### [embed-tei.py](embed-tei.py)
 This script uses the [Text Embeddings Interface](https://huggingface.co/docs/text-embeddings-inference/en/index) like the wikipedia tutorial, but loading the pre-chunked dataset and creating batches that attempt to fit the batch token limit. So we can pack many more small chunks into a single batch to speed things up.
 
 I believe I'm not quite properly utilizing TEI because I only got ~60% GPU utilization and was only using 10GB memory in the A10G GPUs that have 24GB available. So there is probably a way to speed this up even more. That said it only cost ~$50 to embed the entire dataset. It did take ~12 hours because I didn't always have my full allocation of 10 GPUs available.
 
-### summary.py
+### [summary.py](summary.py)
 I found it useful to quickly calculate summary statistics using the same parallel process of loading each file in its own container and performaing some basic pandas calculations.
 
-### fetch.py
+### [fetch.py](fetch.py)
 I made a quick utility to download a single file to inspect locally, which was used in the [notebooks/validate.ipynb](notebooks/validate.ipynb) notebook to confirm that the embedding process was working as expected.
 
 
@@ -51,9 +51,9 @@ This notebook is me taking a look at a single file that was processed and then t
 ## Experimental
 On the way to developing this I was trying to understand how to choose batch sizes and token limits. There are two scripts here:
 
-### batchsize.py
+### [batchsize.py](experimental/batchsize.py)
 This script uses crude measurement techniques to see how much memory gets filled by a batch of tokens. I'm not confident in it anymore because I was able to fit a lot more tokens into the batches I submitted to `embed-tei.py` than I predicted using a A10G instead of an H100.
 
-### embed.py
+### [embed.py](experimental/embed.py)
 This script uses the HuggingFace transformers directly (instead of TEI) so I could have a little more control over how I was embedding. It's the same kind of code I use in Latent Scope for locally embedding smaller datasets so it allowed me to better understand the scaling process.
 The problem is that it's just much slower than TEI.
