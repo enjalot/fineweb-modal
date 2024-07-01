@@ -3,13 +3,13 @@ from modal import App, Image, Volume, Secret
 # We first set out configuration variables for our script.
 DATASET_DIR = "/embeddings"
 VOLUME="embeddings"
-HF_REPO="enjalot/fineweb-edu-sample-10BT-chunked-500-nomic-text-v1.5"
-DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF2"
+HF_REPO="enjalot/fineweb-edu-sample-10BT-chunked-500-nomic-text-v1.5-2"
+DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4"
 
 # We define our Modal Resources that we'll need
 volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
-    "datasets==2.16.1", "apache_beam==2.53.0", "huggingface_hub"
+    "datasets==2.20.0", "huggingface_hub"
 )
 app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
@@ -19,7 +19,7 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 # 6000s to avoid any potential timeout issues
 @app.function(
     volumes={DATASET_DIR: volume}, 
-    timeout=6000,
+    timeout=60000,
     secrets=[Secret.from_name("huggingface-secret")],
 )
 def upload_dataset(directory, repo):
@@ -27,6 +27,7 @@ def upload_dataset(directory, repo):
     import time
 
     from huggingface_hub import HfApi
+    from datasets import load_from_disk
 
 
     api = HfApi(token=os.environ["HF_TOKEN"])
@@ -37,18 +38,22 @@ def upload_dataset(directory, repo):
         exist_ok=True,
     )
 
+    print("loading from disk")
+    dataset=load_from_disk(directory)
+
     print(f"Pushing to hub {HF_REPO}")
     start = time.perf_counter()
-    max_retries = 10
+    max_retries = 20
     for attempt in range(max_retries):
         try:
-            api.upload_folder(
-                folder_path=directory,
-                repo_id=repo,
-                repo_type="dataset",
-                multi_commits=True,
-                multi_commits_verbose=True,
-            )
+            # api.upload_folder(
+            #     folder_path=directory,
+            #     repo_id=repo,
+            #     repo_type="dataset",
+            #     multi_commits=True,
+            #     multi_commits_verbose=True,
+            # )
+            dataset.push_to_hub(repo, num_shards={"train": 99})
             break  # Exit loop if upload is successful
         except Exception as e:
             if attempt < max_retries - 1:
