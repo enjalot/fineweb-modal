@@ -1,3 +1,6 @@
+"""
+Download a dataset from HuggingFace to a modal volume
+s"""
 from modal import App, Image, Volume
 
 # We first set out configuration variables for our script.

@@ -1,3 +1,6 @@
+"""
+Embed a dataset using a HuggingFace model, a good deal slower than TEI
+"""
 import os
 import json
 import time

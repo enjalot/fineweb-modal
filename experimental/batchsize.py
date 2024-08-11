@@ -1,3 +1,6 @@
+"""
+Try to figure out the optimal batch size for embedding on a given GPU
+"""
 import os
 import json
 import time

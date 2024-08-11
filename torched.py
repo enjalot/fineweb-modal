@@ -1,5 +1,7 @@
 """
 Write the embeddings from the dataset to torch files that can be loaded quicker
+
+modal run torched.py
 """
 
 from modal import App, Image, Volume, Secret
@@ -59,8 +61,9 @@ def torch_dataset(shard_size=262144): # 2048*128
     volume.commit()
 
 
+# TODO this should be a CLI argument, and automatic somehow if possible
 NUM_EMBEDDINGS = 25504378
-SHARD_SIZE = 262144
+SHARD_SIZE = 262144 # 2048*128
 
 @app.function(
     volumes={DATASET_DIR: volume}, 
@@ -85,8 +88,8 @@ def torch_dataset_shard(shard):
     end_idx = min(start_idx + SHARD_SIZE, NUM_EMBEDDINGS)
     print("reading", shard)
     shard_embeddings = np.array(train_dataset.select(range(start_idx, end_idx))["embedding"])
-    print("permuting", shard)
-    shard_embeddings = np.random.permutation(shard_embeddings)  # {{ edit_1 }}
+    # print("permuting", shard)
+    # shard_embeddings = np.random.permutation(shard_embeddings)  # {{ edit_1 }}
     print("saving", shard)
     shard_tensor = torch.tensor(shard_embeddings, dtype=torch.float32)
     if not os.path.exists(f"{SAVE_DIRECTORY}"):

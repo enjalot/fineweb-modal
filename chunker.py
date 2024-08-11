@@ -8,8 +8,8 @@ OVERLAP = 0.1 # 10% overlap when chunking
 DATASET_DIR = "/data"
 DATASET_NAME = "HuggingFaceFW/fineweb-edu"
 # DATASET_FILES = "sample/10BT/*.parquet"
-DATASET_SAVE ="fineweb-edu-sample-10BT"
-DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}"
+DATASET_SAVE ="fineweb-edu-sample-100BT"
+DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-{MAX_TOKENS}"
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
@@ -129,7 +129,7 @@ def main():
     # hffs = HfFileSystem()
     # files = hffs.ls("datasets/HuggingFaceFW/fineweb-edu/sample/10BT", detail=False)
 
-    files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
+    files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
     
     # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):

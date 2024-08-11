@@ -1,3 +1,6 @@
+"""
+Upload a dataset from a modal volume to HuggingFace
+"""
 from modal import App, Image, Volume, Secret
 
 # We first set out configuration variables for our script.

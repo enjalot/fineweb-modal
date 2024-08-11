@@ -1,3 +1,9 @@
+"""
+Turn a directory of parquet files into a HuggingFace dataset in the modal volume
+"""
+# TODO: look into keeping the parquet files as is to make the dataset
+
+
 from modal import App, Image, Volume, Secret
 
 DATASET_DIR="/embeddings"

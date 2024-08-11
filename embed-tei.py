@@ -1,3 +1,6 @@
+"""
+Embed a dataset using the HuggingFace TEI
+"""
 import os
 import json
 import time
@@ -7,7 +10,9 @@ import subprocess
 from modal import App, Image, Secret, Volume, build, enter, exit, gpu, method
 
 DATASET_DIR = "/data"
-DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
+DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-500"
+EMBEDDING_DIR = "/embeddings"
 
 # We first set out configuration variables for our script.
 ## Embedding Containers Configuration
@@ -138,17 +143,18 @@ class TextEmbeddingsInference:
   
 
 @app.function(
+    concurrency_limit=10,
     image=Image.debian_slim().pip_install(
         "pandas", "pyarrow", "tqdm"
     ),
     volumes={
         DATASET_DIR: DATASET_READ_VOLUME,
-        CHECKPOINT_DIR: EMBEDDING_CHECKPOINT_VOLUME,
+        EMBEDDING_DIR: EMBEDDING_CHECKPOINT_VOLUME,
     },
     timeout=86400,
     secrets=[Secret.from_name("huggingface-secret")],
 )
-def batch_loader(file, batch_size: int = 512 * 1024):
+def batch_loader(file):
     import pandas as pd
     from tqdm import tqdm
     import time
@@ -174,7 +180,7 @@ def batch_loader(file, batch_size: int = 512 * 1024):
     # Tokenized version of "clustering: "
     prefix = [101, 9324, 2075, 1024]
 
-    print("building batches for ", file, "with batch token limit", batch_size)
+    print("building batches for ", file, "with batch token limit", BATCH_TOKEN_LIMIT)
     start = time.monotonic_ns()
     
     for index, row in df.iterrows():
@@ -186,7 +192,7 @@ def batch_loader(file, batch_size: int = 512 * 1024):
         # proposed_length = max(len(tokens) for tokens in proposed_batch) * len(proposed_batch)
         proposed_length = max(count for count in proposed_batch_count) * len(proposed_batch_count)
 
-        if proposed_length <= batch_size:
+        if proposed_length <= BATCH_TOKEN_LIMIT:
             # current_batch.append(chunk)
             current_batch_text.append(chunkt)
             current_batch_indices.append(index)
@@ -258,9 +264,9 @@ def batch_loader(file, batch_size: int = 512 * 1024):
             df.at[idx, 'embedding'] = embedding
     
     print(f"writing out embeddings file {file}")
-    if not os.path.exists(f"{CHECKPOINT_DIR}/{DATASET_SAVE_CHUNKED}/train"):
-        os.makedirs(f"{CHECKPOINT_DIR}/{DATASET_SAVE_CHUNKED}/train", exist_ok=True)
-    df.to_parquet(f"{CHECKPOINT_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
+    if not os.path.exists(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train"):
+        os.makedirs(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train", exist_ok=True)
+    df.to_parquet(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
     # volume.commit()
     return f"done with {file}"
 
@@ -268,12 +274,18 @@ def batch_loader(file, batch_size: int = 512 * 1024):
 def full_job():
 
     # file = "data-00000-of-00099.parquet"
-    file = "data-00004-of-00099.parquet"
+    # file = "data-00004-of-00099.parquet"
 
-    files = [f"data-{i:05d}-of-00099.parquet" for i in range(5,99)]
-    for file in files:
-        print("kicking off", file)
-        batch_loader.remote(file=file, batch_size = BATCH_TOKEN_LIMIT)
+    files = [f"data-{i:05d}-of-00989.parquet" for i in range(2,100)]
+    # for file in files:
+        # print("kicking off", file)
+        # batch_loader.remote(file=file, batch_size = BATCH_TOKEN_LIMIT)
+    for resp in batch_loader.map(
+        files,
+        order_outputs=False, 
+        return_exceptions=True
+    ):
+        print(resp)
 
     # batch_loader.remote(file=file, batch_size = BATCH_TOKEN_LIMIT)
     print("done")

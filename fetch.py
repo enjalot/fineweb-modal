@@ -1,3 +1,7 @@
+"""
+fetch a file from a modal volume and write it locally
+"""
+
 from modal import App, Image, Volume
 
 # We first set out configuration variables for our script.
