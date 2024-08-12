@@ -267,7 +267,7 @@ def batch_loader(file):
     if not os.path.exists(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train"):
         os.makedirs(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train", exist_ok=True)
     df.to_parquet(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
-    # volume.commit()
+    EMBEDDING_CHECKPOINT_VOLUME.commit()
     return f"done with {file}"
 
 @app.local_entrypoint()
@@ -276,7 +276,8 @@ def full_job():
     # file = "data-00000-of-00099.parquet"
     # file = "data-00004-of-00099.parquet"
 
-    files = [f"data-{i:05d}-of-00989.parquet" for i in range(2,100)]
+    # files = [f"data-{i:05d}-of-00989.parquet" for i in range(2,100)]
+    files = ["data-00097-of-00989.parquet"]
     # for file in files:
         # print("kicking off", file)
         # batch_loader.remote(file=file, batch_size = BATCH_TOKEN_LIMIT)
