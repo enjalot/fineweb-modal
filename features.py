@@ -1,0 +1,166 @@
+"""
+Extract the features for the embeddings of a dataset using a pre-trained SAE model
+
+modal run features.py
+"""
+
+import os
+import time
+from tqdm import tqdm
+from latentsae.sae import Sae
+from modal import App, Image, Volume, Secret, gpu, enter, method
+
+DATASET_DIR="/embeddings"
+VOLUME = "embeddings"
+
+SAE = "64_32"
+DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
+SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
+
+GPU_CONCURRENCY = 10
+# GPU_CONFIG = gpu.A100(size="80GB")
+# GPU_CONFIG = gpu.A100(size="40GB")
+GPU_CONFIG = gpu.A10G()
+# GPU_CONFIG = gpu.H100()
+
+MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-10BT"
+MODEL_DIR = "/model"
+MODEL_REVISION="main"
+
+# We define our Modal Resources that we'll need
+volume = Volume.from_name(VOLUME, create_if_missing=True)
+
+def download_model_to_image(model_dir, model_name, model_revision):
+    from huggingface_hub import snapshot_download
+    from transformers.utils import move_cache
+
+    os.makedirs(model_dir, exist_ok=True)
+
+    snapshot_download(
+        repo_id=model_name,
+        revision=model_revision,
+        local_dir=model_dir,
+        ignore_patterns=["*.pt", "*.bin"],  # Using safetensors
+    )
+    move_cache()
+
+st_image = (
+    Image.debian_slim(python_version="3.10")
+    .pip_install(
+        "torch==2.1.2",
+        "numpy==1.26.3",
+        "transformers==4.39.3",
+        "hf-transfer==0.1.6",
+        "huggingface_hub==0.22.2",
+        "einops==0.7.0",
+        "latentsae"
+    )
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .run_function(
+        download_model_to_image,
+        timeout=60 * 20,
+        kwargs={
+            "model_dir": MODEL_DIR,
+            "model_name": MODEL_ID,
+            "model_revision": MODEL_REVISION,
+        },
+        secrets=[Secret.from_name("huggingface-secret")],
+    )
+)
+app = App(image=st_image)  # Note: prior to April 2024, "app" was called "stub"
+
+with st_image.imports():
+    import numpy as np
+    import torch
+
+@app.cls(
+    volumes={DATASET_DIR: volume}, 
+    gpu=GPU_CONFIG,
+    concurrency_limit=GPU_CONCURRENCY,
+    timeout=60 * 10,
+    container_idle_timeout=60 * 10,
+    allow_concurrent_inputs=1,
+    image=st_image,
+)
+class SAEModel:
+    @enter()
+    def start_engine(self):
+        # import torch
+        self.device = torch.device("cuda")
+        print("🥶 cold starting inference")
+        start = time.monotonic_ns()
+        self.model = Sae.load_from_hub(MODEL_ID, SAE, device=self.device)
+        duration_s = (time.monotonic_ns() - start) / 1e9
+        print(f"🏎️ engine started in {duration_s:.0f}s")
+
+    @method()
+    def make_features(self, file):
+        # Redownload the dataset
+        import time
+        from datasets import load_dataset
+        import torch
+        import pandas as pd
+        import numpy as np
+        import time
+
+        start = time.monotonic_ns()
+        print("loading", file)
+        dataset = load_dataset("arrow", data_files=f"{DIRECTORY}/train/{file}")
+        # df = pd.read_parquet(f"{DIRECTORY}/train/{file}")
+        print("loaded")
+        df = pd.DataFrame(dataset['train'])
+        print("converted to dataframe")
+        embeddings = df['embedding'].to_numpy()
+        print("converted to numpy")
+        embeddings = np.array([np.array(e).astype(np.float32) for e in embeddings])
+        duration_s = (time.monotonic_ns() - start) / 1e9
+        print("loaded", file, "in", duration_s)
+ 
+        start = time.monotonic_ns()
+        print("Encoding embeddings with SAE")
+
+        batch_size = 4096
+        num_batches = (len(embeddings) + batch_size - 1) // batch_size
+        all_acts = np.zeros((len(embeddings), 64))
+        all_indices = np.zeros((len(embeddings), 64))
+        for i in tqdm(range(num_batches), desc="Encoding batches"):
+            batch_embeddings = embeddings[i * batch_size:(i + 1) * batch_size]
+            batch_embeddings_tensor = torch.from_numpy(batch_embeddings).float().to(self.device)
+            batch_features = self.model.encode(batch_embeddings_tensor)
+            all_acts[i * batch_size:(i + 1) * batch_size] = batch_features.top_acts.detach().cpu().numpy()
+            all_indices[i * batch_size:(i + 1) * batch_size] = batch_features.top_indices.detach().cpu().numpy()
+
+        duration_s = (time.monotonic_ns() - start) / 1e9
+        print("encoding completed", duration_s)
+
+        df['top_acts'] = list(all_acts)
+        df['top_indices'] = list(all_indices)
+        df.drop(columns=['embedding'], inplace=True)
+        print("features generated for", file)
+
+        file_name = file.split(".")[0]
+        output_dir = f"{SAVE_DIRECTORY}/train"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        print(f"saving to {output_dir}/{file_name}.parquet")
+        df.to_parquet(f"{output_dir}/{file_name}.parquet")
+
+        volume.commit()
+        return f"done with {file}"
+
+@app.local_entrypoint()
+def main():
+
+    files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
+    files = files[2:]
+    
+    model = SAEModel()
+
+    for resp in model.make_features.map(files, order_outputs=False, return_exceptions=True):
+        if isinstance(resp, Exception):
+            print(f"Exception: {resp}")
+            continue
+        print(resp)
+
+
+

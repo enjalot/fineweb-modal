@@ -35,8 +35,8 @@ def chunk_row(row, tokenizer):
         while start_index < len(tokens):
             end_index = min(start_index + MAX_TOKENS, len(tokens))
             chunk = tokens[start_index:end_index]
-            # TODO: if the chunk_token_count is less than the overlap we should 
-            # TODO: skip the chunk since it is pure overlap and not interesting
+            if len(chunk) < overlap * MAX_TOKENS:
+                break
             chunks.append({
                 "chunk_index": ci,
                 "chunk_text": tokenizer.decode(chunk),
