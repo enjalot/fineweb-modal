@@ -12,9 +12,11 @@ DATASET_DIR = "/embeddings"
 # DATASET_FILES = "sample/10BT/*.parquet"
 # DATASET_SAVE ="fineweb-edu-sample-10BT"
 MAX_TOKENS = 500
-DATASET_SAVE = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}-HF4-64_32"
+# DATASET_SAVE = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}-HF4-64_32"
+DATASET_SAVE = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}-HF4-64_32-top10"
 # DATASET_SAVE = f"fineweb-edu-sample-10BT"
-DIRECTORY = f"{DATASET_DIR}/{DATASET_SAVE}/train"
+# DIRECTORY = f"{DATASET_DIR}/{DATASET_SAVE}/train"
+DIRECTORY = f"{DATASET_DIR}/{DATASET_SAVE}"
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
@@ -47,11 +49,13 @@ def main():
 
     # file = "data-00000-of-00099.arrow"
     file = "data-00000-of-00099.parquet"
+    # file = "data-00001-of-00099.parquet"
     file_path = f"{DIRECTORY}/{file}"
     resp = fetch_dataset.remote(file_path)
     if isinstance(resp, Exception):
         print(f"Exception: {resp}")
     else:
         print(resp)
-        resp.to_parquet(f"./notebooks/{file}")
+        # resp.to_parquet(f"./notebooks/{file}")
+        resp.to_parquet(f"./notebooks/top10-{file}")
         

@@ -136,6 +136,7 @@ class SAEModel:
         df['top_acts'] = list(all_acts)
         df['top_indices'] = list(all_indices)
         df.drop(columns=['embedding'], inplace=True)
+        # df.drop(columns=['chunk_tokens'], inplace=True)
         print("features generated for", file)
 
         file_name = file.split(".")[0]
@@ -151,8 +152,8 @@ class SAEModel:
 @app.local_entrypoint()
 def main():
 
-    files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
-    files = files[2:]
+    files = [f"data-{i:05d}-of-00099.arrow" for i in range(100)]
+    files = files[99:]
     
     model = SAEModel()
 
