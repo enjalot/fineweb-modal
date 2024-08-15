@@ -163,8 +163,12 @@ def batch_loader(file):
     print(f"reading in {file}")
     file_path = f"{DATASET_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}"
     df = pd.read_parquet(file_path)
-    print(f"sorting {file}")
+    print(f"sorting {file}", len(df))
     df = df.sort_values(by='chunk_token_count', ascending=True)
+    # Filter df to only rows with chunk_token_count > 50
+    # TODO: this shouldn't be needed if chunker is run with fix (but 10BT and 100BT were chunked without it)
+    df = df[df['chunk_token_count'] > 50]
+    print(f"Filtered {file} to {len(df)} rows with chunk_token_count > 50")
     # batches = []
     batches_text = []
     current_batch = []
@@ -276,8 +280,8 @@ def full_job():
     # file = "data-00000-of-00099.parquet"
     # file = "data-00004-of-00099.parquet"
 
-    # files = [f"data-{i:05d}-of-00989.parquet" for i in range(2,100)]
-    files = ["data-00097-of-00989.parquet"]
+    files = [f"data-{i:05d}-of-00989.parquet" for i in range(200,500)]
+    # files = ["data-00097-of-00989.parquet"]
     # for file in files:
         # print("kicking off", file)
         # batch_loader.remote(file=file, batch_size = BATCH_TOKEN_LIMIT)
