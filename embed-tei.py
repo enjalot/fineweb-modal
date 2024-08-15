@@ -24,13 +24,20 @@ MODEL_DIR = "/model"
 MODEL_REVISION="main"
 
 GPU_CONCURRENCY = 10
-# GPU_CONFIG = gpu.A100(size="80GB")
-# GPU_CONFIG = gpu.A100(size="40GB")
 GPU_CONFIG = gpu.A10G()
+GPU_IMAGE = "ghcr.io/huggingface/text-embeddings-inference:86-1.2"
+# GPU_CONFIG = gpu.A100(size="40GB")
+# GPU_CONFIG = gpu.A100(size="80GB")
+# GPU_IMAGE = "ghcr.io/huggingface/text-embeddings-inference:1.2"
 # GPU_CONFIG = gpu.H100()
+# GPU_IMAGE = "ghcr.io/huggingface/text-embeddings-inference:hopper-1.2"
+
 
 SENTENCE_TOKEN_LIMIT = 512
-BATCH_TOKEN_LIMIT = 768 * SENTENCE_TOKEN_LIMIT
+CLIENT_BATCH_TOKEN_LIMIT = 768 * SENTENCE_TOKEN_LIMIT #A10G
+SERVER_BATCH_TOKEN_LIMIT = 2*768 * SENTENCE_TOKEN_LIMIT #A10G
+# CLIENT_BATCH_TOKEN_LIMIT =  512 * SENTENCE_TOKEN_LIMIT #A100 40GB
+# SERVER_BATCH_TOKEN_LIMIT = 4*2048 * SENTENCE_TOKEN_LIMIT #A100 40GB
 
 LAUNCH_FLAGS = [
     "--model-id",
@@ -40,7 +47,7 @@ LAUNCH_FLAGS = [
     "--max-client-batch-size",
     str(10000), # lots of small sentences can have large batch
     "--max-batch-tokens",
-    str(BATCH_TOKEN_LIMIT),
+    str(SERVER_BATCH_TOKEN_LIMIT),
     "--auto-truncate",
     "--dtype",
     "float16"
@@ -76,9 +83,7 @@ def spawn_server() -> subprocess.Popen:
 
 tei_image = (
     Image.from_registry(
-        "ghcr.io/huggingface/text-embeddings-inference:86-1.2",
-        # "ghcr.io/huggingface/text-embeddings-inference:1.2",
-        # "ghcr.io/huggingface/text-embeddings-inference:hopper-1.2",
+        GPU_IMAGE,
         add_python="3.10",
     )
     .dockerfile_commands("ENTRYPOINT []")
@@ -122,15 +127,15 @@ class TextEmbeddingsInference:
         texts = chunk_batch[0]
         # print("TEXTS", len(texts))
         res = await self.client.post("/embed", json={"inputs": texts})
-        try:
-          emb = res.json()
-          # print("SUP EMB", len(emb))
-          return chunk_batch, np.array(emb)
+        # try:
+        emb = res.json()
+        # print("SUP EMB", len(emb))
+        return chunk_batch, np.array(emb)
         #   print("res", len(emb))
-        except Exception as e:
-          print("RES", res)
-          # print("ERROR", e)
-          # print("IDS", chunk_batch[1])
+        # except Exception as e:
+        #   print("RES", res)
+        #   print("ERROR", e)
+        #   print("IDS", chunk_batch[1])
 
     # @method()
     # async def embed(self, batch):
@@ -184,7 +189,7 @@ def batch_loader(file):
     # Tokenized version of "clustering: "
     prefix = [101, 9324, 2075, 1024]
 
-    print("building batches for ", file, "with batch token limit", BATCH_TOKEN_LIMIT)
+    print("building batches for ", file, "with client batch token limit", CLIENT_BATCH_TOKEN_LIMIT)
     start = time.monotonic_ns()
     
     for index, row in df.iterrows():
@@ -196,7 +201,7 @@ def batch_loader(file):
         # proposed_length = max(len(tokens) for tokens in proposed_batch) * len(proposed_batch)
         proposed_length = max(count for count in proposed_batch_count) * len(proposed_batch_count)
 
-        if proposed_length <= BATCH_TOKEN_LIMIT:
+        if proposed_length <= CLIENT_BATCH_TOKEN_LIMIT:
             # current_batch.append(chunk)
             current_batch_text.append(chunkt)
             current_batch_indices.append(index)
@@ -280,7 +285,7 @@ def full_job():
     # file = "data-00000-of-00099.parquet"
     # file = "data-00004-of-00099.parquet"
 
-    files = [f"data-{i:05d}-of-00989.parquet" for i in range(200,500)]
+    files = [f"data-{i:05d}-of-00989.parquet" for i in range(522,990)]
     # files = ["data-00097-of-00989.parquet"]
     # for file in files:
         # print("kicking off", file)
