@@ -13,8 +13,10 @@ from modal import App, Image, Volume, Secret, gpu, enter, method
 DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
 
-SAE = "64_32"
 DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
+# SAE = "64_32"
+# SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-2"
+SAE = "64_128"
 SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
 
 GPU_CONCURRENCY = 10
@@ -75,9 +77,9 @@ with st_image.imports():
 
 @app.cls(
     volumes={DATASET_DIR: volume}, 
-    gpu=GPU_CONFIG,
-    concurrency_limit=GPU_CONCURRENCY,
-    timeout=60 * 10,
+    # gpu=GPU_CONFIG,
+    # concurrency_limit=GPU_CONCURRENCY,
+    timeout=60 * 100,
     container_idle_timeout=60 * 10,
     allow_concurrent_inputs=1,
     image=st_image,
@@ -86,7 +88,8 @@ class SAEModel:
     @enter()
     def start_engine(self):
         # import torch
-        self.device = torch.device("cuda")
+        # self.device = torch.device("cuda")
+        self.device = torch.device("cpu")
         print("🥶 cold starting inference")
         start = time.monotonic_ns()
         self.model = Sae.load_from_hub(MODEL_ID, SAE, device=self.device)
@@ -119,7 +122,8 @@ class SAEModel:
         start = time.monotonic_ns()
         print("Encoding embeddings with SAE")
 
-        batch_size = 4096
+        # batch_size = 4096
+        batch_size = 128
         num_batches = (len(embeddings) + batch_size - 1) // batch_size
         all_acts = np.zeros((len(embeddings), 64))
         all_indices = np.zeros((len(embeddings), 64))
@@ -135,8 +139,9 @@ class SAEModel:
 
         df['top_acts'] = list(all_acts)
         df['top_indices'] = list(all_indices)
-        df.drop(columns=['embedding'], inplace=True)
-        # df.drop(columns=['chunk_tokens'], inplace=True)
+        # df.drop(columns=['embedding'], inplace=True)
+        if 'chunk_tokens' in df.columns:
+            df.drop(columns=['chunk_tokens'], inplace=True)
         print("features generated for", file)
 
         file_name = file.split(".")[0]
@@ -152,8 +157,8 @@ class SAEModel:
 @app.local_entrypoint()
 def main():
 
-    files = [f"data-{i:05d}-of-00099.arrow" for i in range(100)]
-    files = files[99:]
+    files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
+    # files = files[0:10]
     
     model = SAEModel()
 

@@ -11,15 +11,16 @@ from tqdm import tqdm
 import concurrent.futures
 from functools import partial
 
-NUM_CPU=8
+NUM_CPU=4
 N=5
 
 DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
 
 D_IN = 768 # the dimensions from the embedding models
-EXPANSION = 32
-SAE = f"64_{EXPANSION}"
+K=64
+EXPANSION = 128
+SAE = f"{K}_{EXPANSION}"
 DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}" 
 SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-top10"
 
@@ -68,7 +69,7 @@ def process_feature_chunk(file, feature_chunk, chunk_index):
     return pd.concat(results, ignore_index=True)
 
 
-@app.function(cpu=NUM_CPU, volumes={DATASET_DIR: volume}, timeout=3000)
+@app.function(cpu=NUM_CPU, volumes={DATASET_DIR: volume}, timeout=6000)
 def process_dataset(file):
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -101,8 +102,13 @@ def process_dataset(file):
 @app.local_entrypoint()
 def main():
     # files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
-    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
-    files = files[2:]
+    # files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+    files = [
+        f"data-00042-of-00099.parquet",
+        f"data-00045-of-00099.parquet",
+        f"data-00048-of-00099.parquet",
+        f"data-00069-of-00099.parquet"
+    ]
     
     # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):

@@ -2,7 +2,8 @@ from modal import App, Image, Volume, Secret
 
 DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
-DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-64_32-top10"
+SAE = "64_128"
+DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-top10"
 
 # We define our Modal Resources that we'll need
 volume = Volume.from_name(VOLUME, create_if_missing=True)
@@ -16,9 +17,12 @@ app = App(image=image)
     timeout=60000,
     # ephemeral_disk=2145728, # in MiB
 )
-def reduce_top10(files, N):
+def reduce_top10(N):
     import pandas as pd
 
+    import os
+
+    files = [f for f in os.listdir(DIRECTORY) if f.endswith('.parquet')]
     df = pd.read_parquet(f"{DIRECTORY}/{files[0]}")
     for file in files[1:]:
         print("loading", file)
@@ -36,7 +40,6 @@ def reduce_top10(files, N):
 
 @app.local_entrypoint()
 def main():
-    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
-    reduce_top10.remote(files, 10)
+    reduce_top10.remote(10)
     
 
