@@ -1,19 +1,29 @@
 """
 Download a dataset from HuggingFace to a modal volume
 s"""
-from modal import App, Image, Volume
+from modal import App, Image, Volume, Secret
 
 # We first set out configuration variables for our script.
+VOLUME = "datasets"
 DATASET_DIR = "/data"
-DATASET_NAME = "HuggingFaceFW/fineweb-edu"
-SAMPLE = "100BT"
-# DATASET_FILES = "sample/10BT/*.parquet"
-DATASET_FILES = f"sample/{SAMPLE}/*.parquet"
-DATASET_SAVE =f"fineweb-edu-sample-{SAMPLE}"
+
+# DATASET_NAME = "togethercomputer/RedPajama-Data-1T-Sample"
+# DATASET_SAVE = "RedPajama-Data-1T-Sample"
+# DATASET_FILES = None
+
+DATASET_NAME = "bigcode/the-stack-dedup"
+DATASET_SAVE = "the-stack-dedup"
+DATASET_FILES = None
+
+# DATASET_NAME = "HuggingFaceFW/fineweb-edu"
+# SAMPLE = "100BT"
+# DATASET_FILES = f"sample/{SAMPLE}/*.parquet"
+# DATASET_SAVE =f"fineweb-edu-sample-{SAMPLE}"
+# VOLUME = "embedding-fineweb-edu"
 
 
 # We define our Modal Resources that we'll need
-volume = Volume.from_name("embedding-fineweb-edu", create_if_missing=True)
+volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
     "datasets==2.16.1", "apache_beam==2.53.0"
 )
@@ -25,17 +35,21 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 # 6000s to avoid any potential timeout issues
 @app.function(
     volumes={DATASET_DIR: volume}, 
-    timeout=6000,
-    ephemeral_disk=2145728 # in MiB
+    timeout=60000,
+    ephemeral_disk=2145728*4, # in MiB
+    secrets=[Secret.from_name("huggingface-secret")],
 )
 def download_dataset():
     # Redownload the dataset
     import time
 
-    from datasets import load_dataset
+    from datasets import load_dataset, DownloadConfig
 
     start = time.time()
-    dataset = load_dataset(DATASET_NAME,  data_files=DATASET_FILES, num_proc=6)
+    if DATASET_FILES:
+        dataset = load_dataset(DATASET_NAME,  data_files=DATASET_FILES, num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True))
+    else:
+        dataset = load_dataset(DATASET_NAME,  num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True))
     end = time.time()
     print(f"Download complete - downloaded files in {end-start}s")
 

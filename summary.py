@@ -1,20 +1,17 @@
 from modal import App, Image, Volume
 
-NUM_CPU=16
-MAX_TOKENS = 500
-OVERLAP = 0.1 # 10% overlap when chunking
 
 # We first set out configuration variables for our script.
 DATASET_DIR = "/data"
-DATASET_NAME = "HuggingFaceFW/fineweb-edu"
-# DATASET_FILES = "sample/10BT/*.parquet"
-DATASET_SAVE ="fineweb-edu-sample-10BT"
-DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}"
+VOLUME = "embedding-fineweb-edu"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
+VOLUME = "datasets"
+DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-120"
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
 # We define our Modal Resources that we'll need
-volume = Volume.from_name("embedding-fineweb-edu", create_if_missing=True)
+volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
     "datasets==2.16.1", "apache_beam==2.53.0", "transformers", "pandas", "tqdm"
 )
@@ -22,7 +19,7 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
 
 
-@app.function(cpu=NUM_CPU, volumes={DATASET_DIR: volume}, timeout=3000)
+@app.function(volumes={DATASET_DIR: volume}, timeout=3000)
 def process_dataset(file):
     import time
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -45,7 +42,8 @@ def process_dataset(file):
 
 @app.local_entrypoint()
 def main():
-    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+    # files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+    files = [f"data-{i:05d}-of-00011.parquet" for i in range(11)]
     responses = []
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):
         if isinstance(resp, Exception):

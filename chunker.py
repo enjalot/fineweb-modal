@@ -1,20 +1,28 @@
 from modal import App, Image, Volume
 
-NUM_CPU=16
-MAX_TOKENS = 500
+NUM_CPU=4
+# MAX_TOKENS = 500
+MAX_TOKENS = 120
 OVERLAP = 0.1 # 10% overlap when chunking
 
 # We first set out configuration variables for our script.
+# VOLUME = "embedding-fineweb-edu"
+VOLUME = "datasets"
 DATASET_DIR = "/data"
-DATASET_NAME = "HuggingFaceFW/fineweb-edu"
-# DATASET_FILES = "sample/10BT/*.parquet"
-DATASET_SAVE ="fineweb-edu-sample-100BT"
-DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-{MAX_TOKENS}"
+# DATASET_NAME = "HuggingFaceFW/fineweb-edu"
+# DATASET_SAVE ="fineweb-edu-sample-100BT"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-{MAX_TOKENS}"
+# KEEP_KEYS = ["id", "url", "score", "dump"] 
+
+DATASET_NAME = "togethercomputer/RedPajama-Data-1T-Sample"
+DATASET_SAVE ="RedPajama-Data-1T-Sample"
+DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-{MAX_TOKENS}"
+KEEP_KEYS = ["meta"]
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
 # We define our Modal Resources that we'll need
-volume = Volume.from_name("embedding-fineweb-edu", create_if_missing=True)
+volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
     "datasets==2.16.1", "apache_beam==2.53.0", "transformers", "pandas", "tqdm"
 )
@@ -22,7 +30,6 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
 def chunk_row(row, tokenizer):
     # print("ROW", row)
-    keep_keys = ["id", "url", "score", "dump"]
     text = row["text"]
     chunks = []
 
@@ -35,14 +42,14 @@ def chunk_row(row, tokenizer):
         while start_index < len(tokens):
             end_index = min(start_index + MAX_TOKENS, len(tokens))
             chunk = tokens[start_index:end_index]
-            if len(chunk) < overlap * MAX_TOKENS:
+            if len(chunk) < overlap:
                 break
             chunks.append({
                 "chunk_index": ci,
                 "chunk_text": tokenizer.decode(chunk),
                 "chunk_tokens": chunk,
                 "chunk_token_count": len(chunk),
-                **{key: row[key] for key in keep_keys}
+                **{key: row[key] for key in KEEP_KEYS}
             })
             start_index += MAX_TOKENS - overlap
             ci += 1
@@ -52,7 +59,7 @@ def chunk_row(row, tokenizer):
             "chunk_text": text,
             "chunk_tokens": tokens,
             "chunk_token_count": token_count,
-            **{key: row[key] for key in keep_keys}
+            **{key: row[key] for key in KEEP_KEYS}
         })
 
     return chunks
@@ -129,7 +136,8 @@ def main():
     # hffs = HfFileSystem()
     # files = hffs.ls("datasets/HuggingFaceFW/fineweb-edu/sample/10BT", detail=False)
 
-    files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
+    # files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
+    files = [f"data-{i:05d}-of-00011.arrow" for i in range(11)]
     
     # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):

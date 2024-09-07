@@ -10,8 +10,12 @@ import subprocess
 from modal import App, Image, Secret, Volume, build, enter, exit, gpu, method
 
 DATASET_DIR = "/data"
+# VOLUME = "embedding-fineweb-edu"
 # DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
-DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-500"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-500"
+VOLUME = "datasets"
+DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-120"
+
 EMBEDDING_DIR = "/embeddings"
 
 # We first set out configuration variables for our script.
@@ -55,7 +59,7 @@ LAUNCH_FLAGS = [
 
 ## Dataset-Specific Configuration
 DATASET_READ_VOLUME = Volume.from_name(
-    "embedding-fineweb-edu", create_if_missing=True
+    VOLUME, create_if_missing=True
 )
 EMBEDDING_CHECKPOINT_VOLUME = Volume.from_name(
     "embeddings", create_if_missing=True

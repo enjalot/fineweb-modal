@@ -14,18 +14,14 @@ DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
 
 DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
-# SAE = "64_32"
+SAE = "64_32"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-2"
-SAE = "64_128"
-SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
+SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3"
+# SAE = "64_128"
+# SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
 
-GPU_CONCURRENCY = 10
-# GPU_CONFIG = gpu.A100(size="80GB")
-# GPU_CONFIG = gpu.A100(size="40GB")
-GPU_CONFIG = gpu.A10G()
-# GPU_CONFIG = gpu.H100()
 
-MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-10BT"
+MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-100BT"
 MODEL_DIR = "/model"
 MODEL_REVISION="main"
 
@@ -55,7 +51,7 @@ st_image = (
         "hf-transfer==0.1.6",
         "huggingface_hub==0.22.2",
         "einops==0.7.0",
-        "latentsae"
+        "latentsae==0.1.0"
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
     .run_function(
@@ -77,8 +73,6 @@ with st_image.imports():
 
 @app.cls(
     volumes={DATASET_DIR: volume}, 
-    # gpu=GPU_CONFIG,
-    # concurrency_limit=GPU_CONCURRENCY,
     timeout=60 * 100,
     container_idle_timeout=60 * 10,
     allow_concurrent_inputs=1,
@@ -88,7 +82,6 @@ class SAEModel:
     @enter()
     def start_engine(self):
         # import torch
-        # self.device = torch.device("cuda")
         self.device = torch.device("cpu")
         print("🥶 cold starting inference")
         start = time.monotonic_ns()

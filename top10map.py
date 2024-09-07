@@ -19,10 +19,11 @@ VOLUME = "embeddings"
 
 D_IN = 768 # the dimensions from the embedding models
 K=64
-EXPANSION = 128
+# EXPANSION = 128
+EXPANSION = 32
 SAE = f"{K}_{EXPANSION}"
-DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}" 
-SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-top10"
+DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3" 
+SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3-top10"
 
 # We define our Modal Resources that we'll need
 volume = Volume.from_name(VOLUME, create_if_missing=True)
@@ -31,21 +32,28 @@ image = Image.debian_slim(python_version="3.9").pip_install(
 )
 app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
-def get_top_n_rows_by_top_act(df, top_indices, top_acts, index):
-    index_positions = np.where(np.any(top_indices == index, axis=1),
-                           np.argmax(top_indices == index, axis=1),
+def get_top_n_rows_by_top_act(file, top_indices, top_acts, feature):
+    feature_positions = np.where(np.any(top_indices == feature, axis=1),
+                           np.argmax(top_indices == feature, axis=1),
                            -1)
     
-    act_values = np.where(index_positions != -1, 
-                      top_acts[np.arange(len(top_acts)), index_positions], 
+    act_values = np.where(feature_positions != -1, 
+                      top_acts[np.arange(len(top_acts)), feature_positions], 
                       0)
 
     top_5_indices = np.argsort(act_values)[-5:][::-1]
-    filtered_df = df.loc[top_5_indices].copy()
-    filtered_df['feature'] = index
-    filtered_df['activation'] = act_values[top_5_indices]
+    # filtered_df = df.loc[top_5_indices].copy()
+    filtered_df = pd.DataFrame({
+        "shard": file,
+        "index": top_5_indices,
+        "feature": feature,
+        "activation": act_values[top_5_indices]
+    })
     return filtered_df
 
+# TODO: this uses an incredible amount of memory
+# maybe there is a way to reduce memory usage
+# for one thing, i'm loading the whole df into memory for each thread (which is 2gb file)
 def process_feature_chunk(file, feature_chunk, chunk_index):
     start = time.perf_counter()
     print(f"Loading dataset from {DIRECTORY}/train/{file}", chunk_index)
@@ -63,8 +71,8 @@ def process_feature_chunk(file, feature_chunk, chunk_index):
     print("got numpy arrays", chunk_index)
     
     results = []
-    for index in tqdm(feature_chunk, desc=f"Chunk {chunk_index}", position=chunk_index):
-        top = get_top_n_rows_by_top_act(df, top_indices, top_acts, index)
+    for feature in tqdm(feature_chunk, desc=f"Chunk {chunk_index}", position=chunk_index):
+        top = get_top_n_rows_by_top_act(file, top_indices, top_acts, feature)
         results.append(top)
     return pd.concat(results, ignore_index=True)
 
@@ -101,14 +109,12 @@ def process_dataset(file):
 
 @app.local_entrypoint()
 def main():
-    # files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
-    # files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
-    files = [
-        f"data-00042-of-00099.parquet",
-        f"data-00045-of-00099.parquet",
-        f"data-00048-of-00099.parquet",
-        f"data-00069-of-00099.parquet"
-    ]
+    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+    # files = [
+    #     f"data-00009-of-00099.parquet",
+    #     f"data-00012-of-00099.parquet",
+    #     f"data-00016-of-00099.parquet",
+    # ]
     
     # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):
