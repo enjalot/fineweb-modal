@@ -3,10 +3,21 @@ from modal import App, Image, Volume
 
 # We first set out configuration variables for our script.
 DATASET_DIR = "/data"
-VOLUME = "embedding-fineweb-edu"
+# VOLUME = "embedding-fineweb-edu"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-120"
 # DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
+# files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+
+
+
 VOLUME = "datasets"
-DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-120"
+# DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-120"
+# DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-500"
+# files = [f"data-{i:05d}-of-00150.parquet" for i in range(150)]
+# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
+DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
+files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
+
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
@@ -42,8 +53,7 @@ def process_dataset(file):
 
 @app.local_entrypoint()
 def main():
-    # files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
-    files = [f"data-{i:05d}-of-00011.parquet" for i in range(11)]
+    from tqdm import tqdm
     responses = []
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):
         if isinstance(resp, Exception):
@@ -57,7 +67,7 @@ def main():
     total_less2 = 0
     total_less10 = 0
     total_less50 = 0
-    for resp in responses:
+    for resp in tqdm(responses):
         total_rows += resp['num_rows']
         total_tokens += resp['tokens']
         total_less2 += resp['less2']

@@ -4,20 +4,41 @@ NUM_CPU=4
 # MAX_TOKENS = 500
 MAX_TOKENS = 120
 OVERLAP = 0.1 # 10% overlap when chunking
+BATCH_SIZE = 200 # number of rows to process per thread at once
 
 # We first set out configuration variables for our script.
-# VOLUME = "embedding-fineweb-edu"
-VOLUME = "datasets"
 DATASET_DIR = "/data"
-# DATASET_NAME = "HuggingFaceFW/fineweb-edu"
+
+# https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu
+# VOLUME = "embedding-fineweb-edu"
+# DATASET_SAVE ="fineweb-edu-sample-10BT"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-{MAX_TOKENS}"
+# TEXT_KEY = "text"
+# KEEP_KEYS = ["id", "url", "score", "dump"] 
+# files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
+
+# VOLUME = "embedding-fineweb-edu"
 # DATASET_SAVE ="fineweb-edu-sample-100BT"
 # DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-{MAX_TOKENS}"
 # KEEP_KEYS = ["id", "url", "score", "dump"] 
 
-DATASET_NAME = "togethercomputer/RedPajama-Data-1T-Sample"
-DATASET_SAVE ="RedPajama-Data-1T-Sample"
-DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-{MAX_TOKENS}"
+
+# https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2
+# VOLUME = "datasets"
+# DATASET_SAVE ="RedPajama-Data-V2-sample-10B"
+# DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-{MAX_TOKENS}"
+# TEXT_KEY = "raw_content"
+# KEEP_KEYS = ["doc_id", "meta"]
+# files = [f"data-{i:05d}-of-00150.arrow" for i in range(150)]
+
+# https://huggingface.co/datasets/monology/pile-uncopyrighted
+VOLUME = "datasets"
+DATASET_SAVE ="pile-uncopyrighted"
+DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-{MAX_TOKENS}"
+TEXT_KEY = "text"
 KEEP_KEYS = ["meta"]
+files = [f"data-{i:05d}-of-01987.arrow" for i in range(200)]
+
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
@@ -30,8 +51,10 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
 def chunk_row(row, tokenizer):
     # print("ROW", row)
-    text = row["text"]
+    text = row[TEXT_KEY]
     chunks = []
+
+    # TODO: don't save an empty chunk
 
     tokens = tokenizer.encode(text)
     token_count = len(tokens)
@@ -100,20 +123,13 @@ def process_dataset(file):
             return batch_chunks
 
         print(f"making batches for {file}")
-        batch_size = 200  # Adjust batch size based on your needs
-        batches = [df.iloc[i:i + batch_size].to_dict(orient="records") for i in range(0, len(df), batch_size)]
+        batches = [df.iloc[i:i + BATCH_SIZE].to_dict(orient="records") for i in range(0, len(df), BATCH_SIZE)]
         print(f"made batches for {file}")
         print(f"setting up futures for {file}")
         futures = [executor.submit(process_batch, batch) for batch in batches]
-        # futures = [executor.submit(chunk_row, row) for index, row in df.iterrows()]
-        # for future in tqdm(as_completed(futures), total=len(df), desc="Processing Rows"):
-        #     chunks_list.extend(future.result())
         print(f"in the future for {file}")
-        # pbar = tqdm(total=len(df)//batch_size, desc="Processing Rows")
         for future in as_completed(futures):
             chunks_list.extend(future.result())
-            # print(len(chunks_list))
-            # pbar.update(1)  # Manually update the progress bar
         pbar.close()
 
     chunked_df = pd.DataFrame(chunks_list)
@@ -137,7 +153,7 @@ def main():
     # files = hffs.ls("datasets/HuggingFaceFW/fineweb-edu/sample/10BT", detail=False)
 
     # files = [f"data-{i:05d}-of-00989.arrow" for i in range(989)]
-    files = [f"data-{i:05d}-of-00011.arrow" for i in range(11)]
+    # files = [f"data-{i:05d}-of-00011.arrow" for i in range(11)]
     
     # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):

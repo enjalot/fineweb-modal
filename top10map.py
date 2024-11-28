@@ -12,7 +12,8 @@ import concurrent.futures
 from functools import partial
 
 NUM_CPU=4
-N=5
+
+N=5 # the number of samples to keep per feature
 
 DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
@@ -25,6 +26,8 @@ SAE = f"{K}_{EXPANSION}"
 DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3" 
 SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3-top10"
 
+files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+
 # We define our Modal Resources that we'll need
 volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
@@ -33,21 +36,32 @@ image = Image.debian_slim(python_version="3.9").pip_install(
 app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 
 def get_top_n_rows_by_top_act(file, top_indices, top_acts, feature):
-    feature_positions = np.where(np.any(top_indices == feature, axis=1),
-                           np.argmax(top_indices == feature, axis=1),
-                           -1)
-    
-    act_values = np.where(feature_positions != -1, 
-                      top_acts[np.arange(len(top_acts)), feature_positions], 
-                      0)
+    # feature_positions = np.where(np.any(top_indices == feature, axis=1),
+    #                        np.argmax(top_indices == feature, axis=1),
+    #                        -1)
+    # act_values = np.where(feature_positions != -1, 
+    #                   top_acts[np.arange(len(top_acts)), feature_positions], 
+    #                   0)
+    # top_n_indices = np.argsort(act_values)[-N:][::-1]
 
-    top_5_indices = np.argsort(act_values)[-5:][::-1]
-    # filtered_df = df.loc[top_5_indices].copy()
+    # Find positions where feature appears (returns a boolean mask)
+    feature_mask = top_indices == feature
+    
+    # Get the activation values where the feature appears (all others will be 0)
+    act_values = np.where(feature_mask.any(axis=1),
+                         top_acts[feature_mask].reshape(-1),
+                         0)
+    
+    # Use partition to get top N indices efficiently
+    top_n_indices = np.argpartition(act_values, -N)[-N:]
+    # Sort just the top N indices
+    top_n_indices = top_n_indices[np.argsort(act_values[top_n_indices])[::-1]]
+
     filtered_df = pd.DataFrame({
         "shard": file,
-        "index": top_5_indices,
+        "index": top_n_indices,
         "feature": feature,
-        "activation": act_values[top_5_indices]
+        "activation": act_values[top_n_indices]
     })
     return filtered_df
 
@@ -109,14 +123,6 @@ def process_dataset(file):
 
 @app.local_entrypoint()
 def main():
-    files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
-    # files = [
-    #     f"data-00009-of-00099.parquet",
-    #     f"data-00012-of-00099.parquet",
-    #     f"data-00016-of-00099.parquet",
-    # ]
-    
-    # process_dataset.remote(file, max_tokens=MAX_TOKENS, num_cpu=NUM_CPU)
     for resp in process_dataset.map(files, order_outputs=False, return_exceptions=True):
         if isinstance(resp, Exception):
             print(f"Exception: {resp}")

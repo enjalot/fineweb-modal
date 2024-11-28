@@ -13,15 +13,22 @@ from modal import App, Image, Volume, Secret, gpu, enter, method
 DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
 
-DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
-SAE = "64_32"
+# DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
+DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-120-all-MiniLM-L6-v2" 
+DIRECTORY = f"{DATASET_DIR}/RedPajama-Data-V2-sample-10B-chunked-120-all-MiniLM-L6-v2" 
+DIRECTORY = f"{DATASET_DIR}/pile-uncopyrighted-chunked-120-all-MiniLM-L6-v2" 
+# SAE = "64_32"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-2"
-SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3"
+# SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3"
 # SAE = "64_128"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
+SAE = "64_64"
+SAVE_DIRECTORY = f"{DIRECTORY}-{SAE}"
+D_IN = 384
 
 
-MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-100BT"
+# MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-100BT"
+MODEL_ID = "enjalot/sae-all-MiniLM-L6-v2"
 MODEL_DIR = "/model"
 MODEL_REVISION="main"
 
@@ -101,15 +108,21 @@ class SAEModel:
 
         start = time.monotonic_ns()
         print("loading", file)
-        dataset = load_dataset("arrow", data_files=f"{DIRECTORY}/train/{file}")
-        # df = pd.read_parquet(f"{DIRECTORY}/train/{file}")
-        print("loaded")
-        df = pd.DataFrame(dataset['train'])
-        print("converted to dataframe")
-        embeddings = df['embedding'].to_numpy()
-        print("converted to numpy")
-        embeddings = np.array([np.array(e).astype(np.float32) for e in embeddings])
-        duration_s = (time.monotonic_ns() - start) / 1e9
+        # dataset = load_dataset("arrow", data_files=f"{DIRECTORY}/train/{file}")
+        # # df = pd.read_parquet(f"{DIRECTORY}/train/{file}")
+        # print("loaded")
+        # df = pd.DataFrame(dataset['train'])
+        # print("converted to dataframe")
+        # embeddings = df['embedding'].to_numpy()
+        # print("converted to numpy")
+        # embeddings = np.array([np.array(e).astype(np.float32) for e in embeddings])
+        # duration_s = (time.monotonic_ns() - start) / 1e9
+        # read the npy memmapped file
+        size= os.path.getsize(file) // (D_IN * 4)
+        embeddings = np.memmap(file, 
+                      dtype='float32', 
+                      mode='r', 
+                      shape=(size, D_IN))
         print("loaded", file, "in", duration_s)
  
         start = time.monotonic_ns()
@@ -130,11 +143,12 @@ class SAEModel:
         duration_s = (time.monotonic_ns() - start) / 1e9
         print("encoding completed", duration_s)
 
+        df = pd.DataFrame()
         df['top_acts'] = list(all_acts)
         df['top_indices'] = list(all_indices)
-        # df.drop(columns=['embedding'], inplace=True)
-        if 'chunk_tokens' in df.columns:
-            df.drop(columns=['chunk_tokens'], inplace=True)
+        # # df.drop(columns=['embedding'], inplace=True)
+        # if 'chunk_tokens' in df.columns:
+        #     df.drop(columns=['chunk_tokens'], inplace=True)
         print("features generated for", file)
 
         file_name = file.split(".")[0]

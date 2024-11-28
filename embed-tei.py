@@ -10,24 +10,55 @@ import subprocess
 from modal import App, Image, Secret, Volume, build, enter, exit, gpu, method
 
 DATASET_DIR = "/data"
+
+### CHUNKED DATASET
 # VOLUME = "embedding-fineweb-edu"
 # DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-500"
-# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-100BT-chunked-500"
+# files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+
+# VOLUME = "embedding-fineweb-edu"
+# DATASET_SAVE_CHUNKED = f"fineweb-edu-sample-10BT-chunked-120"
+# files = [f"data-{i:05d}-of-00099.parquet" for i in range(99)]
+
+# VOLUME = "datasets"
+# DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-120"
+# files = [f"data-{i:05d}-of-00150.parquet" for i in range(150)]
+
+# VOLUME = "datasets"
+# DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-500"
+# files = [f"data-{i:05d}-of-00150.parquet" for i in range(150)]
+
 VOLUME = "datasets"
-DATASET_SAVE_CHUNKED = f"RedPajama-Data-1T-Sample-chunked-120"
+DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
+# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
+files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
+
+
+
+
+
 
 EMBEDDING_DIR = "/embeddings"
 
-# We first set out configuration variables for our script.
-## Embedding Containers Configuration
-# GPU_CONCURRENCY = 100
-MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
+#### MODEL
+# Tokenized version of "clustering: " prefix = [101, 9324, 2075, 1024]
+# PREFIX = "clustering: "
+# PREFIX_TOKEN_COUNT = 4
+# MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
+
+# PREFIX = """
+# PREFIX_TOKEN_COUNT = 0
+# MODEL_ID = "BAAI/bge-base-en-v1.5"
+
+PREFIX = ""
+PREFIX_TOKEN_COUNT = 0
+MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL_SLUG = MODEL_ID.split("/")[-1]
 
 MODEL_DIR = "/model"
 MODEL_REVISION="main"
 
-GPU_CONCURRENCY = 10
+GPU_CONCURRENCY = 30
 GPU_CONFIG = gpu.A10G()
 GPU_IMAGE = "ghcr.io/huggingface/text-embeddings-inference:86-1.2"
 # GPU_CONFIG = gpu.A100(size="40GB")
@@ -49,7 +80,7 @@ LAUNCH_FLAGS = [
     "--port",
     "8000",
     "--max-client-batch-size",
-    str(10000), # lots of small sentences can have large batch
+    str(20000), # lots of small sentences can have large batch
     "--max-batch-tokens",
     str(SERVER_BATCH_TOKEN_LIMIT),
     "--auto-truncate",
@@ -152,7 +183,7 @@ class TextEmbeddingsInference:
   
 
 @app.function(
-    concurrency_limit=10,
+    concurrency_limit=GPU_CONCURRENCY, # keep it the same as the embedding servers
     image=Image.debian_slim().pip_install(
         "pandas", "pyarrow", "tqdm"
     ),
@@ -168,38 +199,35 @@ def batch_loader(file):
     from tqdm import tqdm
     import time
 
-
     print(f"reading in {file}")
     file_path = f"{DATASET_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}"
     df = pd.read_parquet(file_path)
+    df['original_position'] = np.arange(len(df))
     print(f"sorting {file}", len(df))
     df = df.sort_values(by='chunk_token_count', ascending=True)
-    # Filter df to only rows with chunk_token_count > 50
-    # TODO: this shouldn't be needed if chunker is run with fix (but 10BT and 100BT were chunked without it)
-    df = df[df['chunk_token_count'] > 50]
-    print(f"Filtered {file} to {len(df)} rows with chunk_token_count > 50")
-    # batches = []
+    # df = df.reset_index(drop=True)
+
     batches_text = []
-    current_batch = []
     current_batch_counts = []
     current_batch_text = []
-    # current_token_count = 0
     batch_indices = []
     current_batch_indices = []
-    # attention_masks = []  # List to store attention masks for each batch
     packed = []
-
-
-    # Tokenized version of "clustering: "
-    prefix = [101, 9324, 2075, 1024]
 
     print("building batches for ", file, "with client batch token limit", CLIENT_BATCH_TOKEN_LIMIT)
     start = time.monotonic_ns()
     
-    for index, row in df.iterrows():
-        chunk_token_count = row['chunk_token_count'] + 4 # 4 for the prefix
+    # idx is actually the original index since i didn't reset the index during sort
+    # i just hate that its implied and had a bug when i didn't realize it
+    for idx, row in df.iterrows():
+        original_idx = row['original_position']
+        chunk_token_count = row['chunk_token_count'] + PREFIX_TOKEN_COUNT # 4 for the prefix
         # chunk = prefix + list(row['chunk_tokens'])
-        chunkt = "clustering: " + row['chunk_text']
+        chunkt = PREFIX + row['chunk_text']
+        if not chunkt or not chunkt.strip():
+            print(f"WARNING: Empty chunk detected at index {original_idx}")
+            chunkt = " "
+            chunk_token_count = 1
         # proposed_batch = current_batch + [chunk]
         proposed_batch_count = current_batch_counts + [chunk_token_count]
         # proposed_length = max(len(tokens) for tokens in proposed_batch) * len(proposed_batch)
@@ -208,7 +236,7 @@ def batch_loader(file):
         if proposed_length <= CLIENT_BATCH_TOKEN_LIMIT:
             # current_batch.append(chunk)
             current_batch_text.append(chunkt)
-            current_batch_indices.append(index)
+            current_batch_indices.append(original_idx)
             current_batch_counts.append(chunk_token_count)
             # current_token_count = proposed_length
         else:
@@ -224,7 +252,7 @@ def batch_loader(file):
             # current_batch = [chunk]
             current_batch_counts = [chunk_token_count]
             current_batch_text = [chunkt]
-            current_batch_indices = [index]
+            current_batch_indices = [original_idx]
             # current_token_count = len(chunk)
 
     if current_batch_counts:
@@ -265,21 +293,35 @@ def batch_loader(file):
         responses.append(resp)
         pbar.update(1)
 
-    # Ensure the 'embedding' column exists
-    if 'embedding' not in df.columns:
-        df['embedding'] = None  # Initialize the column with None or an appropriate default value
+    # # Ensure the 'embedding' column exists
+    # if 'embedding' not in df.columns:
+    #     df['embedding'] = None  # Initialize the column with None or an appropriate default value
 
-    print("zipping batches with responses")
-    for batch, response in responses:
-        # print("RESPONSE!", response)
-        # print("RESPONSE", len(response))
-        for idx, embedding in zip(batch[1], response):
-            df.at[idx, 'embedding'] = embedding
+    # print("zipping batches with responses")
+    # for batch, response in responses:
+    #     for idx, embedding in zip(batch[1], response):
+    #         df.at[idx, 'embedding'] = embedding
     
-    print(f"writing out embeddings file {file}")
-    if not os.path.exists(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train"):
-        os.makedirs(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train", exist_ok=True)
-    df.to_parquet(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
+    # print(f"writing out embeddings file {file}")
+    # if not os.path.exists(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train"):
+    #     os.makedirs(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train", exist_ok=True)
+    # df.to_parquet(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}/train/{file}")
+
+    if not os.path.exists(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}-{MODEL_SLUG}/train"):
+        os.makedirs(f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}-{MODEL_SLUG}/train", exist_ok=True)
+
+    embedding_dim = responses[0][1].shape[1]
+    embedding_path = f"{EMBEDDING_DIR}/{DATASET_SAVE_CHUNKED}-{MODEL_SLUG}/train/{file.replace('.parquet', '.npy')}"
+    mmap_embeddings = np.memmap(embedding_path, dtype='float32', mode='w+', shape=(len(df), embedding_dim))
+    
+    print("writing embeddings to disk")
+    for batch, response in responses:
+        for idx, embedding in zip(batch[1], response):
+            mmap_embeddings[idx] = embedding
+        mmap_embeddings.flush()
+    
+    del mmap_embeddings
+
     EMBEDDING_CHECKPOINT_VOLUME.commit()
     return f"done with {file}"
 
@@ -289,7 +331,7 @@ def full_job():
     # file = "data-00000-of-00099.parquet"
     # file = "data-00004-of-00099.parquet"
 
-    files = [f"data-{i:05d}-of-00989.parquet" for i in range(522,990)]
+    # files = [f"data-{i:05d}-of-00989.parquet" for i in range(522,990)]
     # files = ["data-00097-of-00989.parquet"]
     # for file in files:
         # print("kicking off", file)

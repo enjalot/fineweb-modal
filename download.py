@@ -7,13 +7,26 @@ from modal import App, Image, Volume, Secret
 VOLUME = "datasets"
 DATASET_DIR = "/data"
 
-# DATASET_NAME = "togethercomputer/RedPajama-Data-1T-Sample"
-# DATASET_SAVE = "RedPajama-Data-1T-Sample"
+HF_CACHE_DIR = f"{DATASET_DIR}/cache"
+
+# DATASET_NAME = "togethercomputer/RedPajama-Data-V2"
+# DATASET_SAVE = "RedPajama-Data-V2-sample-10B"
+# DATASET_SAMPLE = "sample-10B"
 # DATASET_FILES = None
 
-DATASET_NAME = "bigcode/the-stack-dedup"
-DATASET_SAVE = "the-stack-dedup"
+# DATASET_NAME = "monology/pile-uncopyrighted"
+# DATASET_SAVE = "pile-uncopyrighted"
+# DATASET_SAMPLE = None
+# DATASET_FILES = None
+
+DATASET_NAME = "PleIAs/common_corpus"
+DATASET_SAVE = "common_corpus"
+DATASET_SAMPLE = None
 DATASET_FILES = None
+
+# DATASET_NAME = "bigcode/the-stack-dedup"
+# DATASET_SAVE = "the-stack-dedup"
+# DATASET_FILES = None
 
 # DATASET_NAME = "HuggingFaceFW/fineweb-edu"
 # SAMPLE = "100BT"
@@ -36,7 +49,7 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 @app.function(
     volumes={DATASET_DIR: volume}, 
     timeout=60000,
-    ephemeral_disk=2145728*4, # in MiB
+    ephemeral_disk=int(3145728), # in MiB
     secrets=[Secret.from_name("huggingface-secret")],
 )
 def download_dataset():
@@ -47,9 +60,11 @@ def download_dataset():
 
     start = time.time()
     if DATASET_FILES:
-        dataset = load_dataset(DATASET_NAME,  data_files=DATASET_FILES, num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True))
+        dataset = load_dataset(DATASET_NAME,  data_files=DATASET_FILES, num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True, cache_dir=HF_CACHE_DIR))
+    elif DATASET_SAMPLE:
+        dataset = load_dataset(DATASET_NAME,  DATASET_SAMPLE, num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True, cache_dir=HF_CACHE_DIR))
     else:
-        dataset = load_dataset(DATASET_NAME,  num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True))
+        dataset = load_dataset(DATASET_NAME,  num_proc=6, trust_remote_code=True, download_config=DownloadConfig(resume_download=True, cache_dir=HF_CACHE_DIR))
     end = time.time()
     print(f"Download complete - downloaded files in {end-start}s")
 
