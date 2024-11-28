@@ -4,3 +4,5 @@ venv
 .DS_Store
 *.arrow
 data
+*.parquet
+*.npy
