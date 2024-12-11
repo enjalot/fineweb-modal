@@ -55,8 +55,14 @@ app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 def download_dataset():
     # Redownload the dataset
     import time
+    import os
 
-    from datasets import load_dataset, DownloadConfig
+    # Set HF cache environment variable
+    os.environ['HF_HOME'] = HF_CACHE_DIR
+    
+
+    from datasets import load_dataset, DownloadConfig, logging
+    logging.set_verbosity_debug()
 
     start = time.time()
     if DATASET_FILES:
@@ -74,6 +80,11 @@ def download_dataset():
 @app.function(volumes={DATASET_DIR: volume})
 def load_dataset():
     import time
+    import os
+
+    # Set HF cache environment variable
+    os.environ['HF_HOME'] = HF_CACHE_DIR
+    
 
     from datasets import load_from_disk
 
