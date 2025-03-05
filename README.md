@@ -1,6 +1,6 @@
-# fineweb-modal
+# latent-data-modal
 
-This repository is a set of scripts used to process and embed a sample of the [FineWeb-edu dataset](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) using on-demand infrastructure via [Modal](https://modal.com).
+This repository is a set of scripts used to process and embed a large datasets using on-demand infrastructure via [Modal](https://modal.com).
 
 The first resulting dataset published is [FineWeb-edu 10BT Sample embedded with nomic-text-v1.5](https://huggingface.co/datasets/enjalot/fineweb-edu-sample-10BT-chunked-500-nomic-text-v1.5).
 
