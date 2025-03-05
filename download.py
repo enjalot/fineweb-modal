@@ -9,6 +9,13 @@ DATASET_DIR = "/data"
 
 HF_CACHE_DIR = f"{DATASET_DIR}/cache"
 
+# DATASET_NAME = "HuggingFaceFW/fineweb-edu"
+# SAMPLE = "100BT"
+# DATASET_FILES = f"sample/{SAMPLE}/*.parquet"
+# DATASET_SAVE =f"fineweb-edu-sample-{SAMPLE}"
+# VOLUME = "embedding-fineweb-edu"
+
+
 # DATASET_NAME = "togethercomputer/RedPajama-Data-V2"
 # DATASET_SAVE = "RedPajama-Data-V2-sample-10B"
 # DATASET_SAMPLE = "sample-10B"
@@ -19,26 +26,32 @@ HF_CACHE_DIR = f"{DATASET_DIR}/cache"
 # DATASET_SAMPLE = None
 # DATASET_FILES = None
 
-DATASET_NAME = "PleIAs/common_corpus"
-DATASET_SAVE = "common_corpus"
-DATASET_SAMPLE = None
-DATASET_FILES = None
+# DATASET_NAME = "PleIAs/common_corpus"
+# DATASET_SAVE = "common_corpus"
+# DATASET_SAMPLE = None
+# DATASET_FILES = None
 
 # DATASET_NAME = "bigcode/the-stack-dedup"
 # DATASET_SAVE = "the-stack-dedup"
 # DATASET_FILES = None
 
-# DATASET_NAME = "HuggingFaceFW/fineweb-edu"
-# SAMPLE = "100BT"
-# DATASET_FILES = f"sample/{SAMPLE}/*.parquet"
-# DATASET_SAVE =f"fineweb-edu-sample-{SAMPLE}"
-# VOLUME = "embedding-fineweb-edu"
+# DATASET_NAME = "wikimedia/wikipedia"
+# DATASET_SAVE = "wikipedia-en"
+# DATASET_SAMPLE = "20231101.en"
+# DATASET_FILES = None
+
+DATASET_NAME = "MedRAG/pubmed"
+DATASET_SAVE = "medrag-pubmed"
+DATASET_SAMPLE = None
+DATASET_FILES = None
+
+
 
 
 # We define our Modal Resources that we'll need
 volume = Volume.from_name(VOLUME, create_if_missing=True)
 image = Image.debian_slim(python_version="3.9").pip_install(
-    "datasets==2.16.1", "apache_beam==2.53.0"
+    "datasets==3.2.0"
 )
 app = App(image=image)  # Note: prior to April 2024, "app" was called "stub"
 

@@ -28,13 +28,20 @@ DATASET_DIR = "/data"
 # DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-500"
 # files = [f"data-{i:05d}-of-00150.parquet" for i in range(150)]
 
+# VOLUME = "datasets"
+# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
+# # DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
+# files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
+
+# VOLUME = "datasets"
+# # DATASET_SAVE_CHUNKED = f"wikipedia-en-chunked-120"
+# DATASET_SAVE_CHUNKED = f"wikipedia-en-chunked-500"
+# # DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
+# files = [f"data-{i:05d}-of-00041.parquet" for i in range(41)]
+
 VOLUME = "datasets"
-DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
-# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
-files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
-
-
-
+DATASET_SAVE_CHUNKED = f"medrag-pubmed-500"
+files = [f"data-{i:05d}-of-00138.parquet" for i in range(138)]
 
 
 
@@ -42,17 +49,18 @@ EMBEDDING_DIR = "/embeddings"
 
 #### MODEL
 # Tokenized version of "clustering: " prefix = [101, 9324, 2075, 1024]
-# PREFIX = "clustering: "
-# PREFIX_TOKEN_COUNT = 4
-# MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
+PREFIX = "clustering: "
+PREFIX_TOKEN_COUNT = 4
+MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
 
 # PREFIX = """
 # PREFIX_TOKEN_COUNT = 0
 # MODEL_ID = "BAAI/bge-base-en-v1.5"
 
-PREFIX = ""
-PREFIX_TOKEN_COUNT = 0
-MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
+# PREFIX = ""
+# PREFIX_TOKEN_COUNT = 0
+# MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
+
 MODEL_SLUG = MODEL_ID.split("/")[-1]
 
 MODEL_DIR = "/model"

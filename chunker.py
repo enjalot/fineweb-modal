@@ -1,8 +1,8 @@
 from modal import App, Image, Volume
 
 NUM_CPU=4
-# MAX_TOKENS = 500
-MAX_TOKENS = 120
+MAX_TOKENS = 500
+# MAX_TOKENS = 120
 OVERLAP = 0.1 # 10% overlap when chunking
 BATCH_SIZE = 200 # number of rows to process per thread at once
 
@@ -32,12 +32,29 @@ DATASET_DIR = "/data"
 # files = [f"data-{i:05d}-of-00150.arrow" for i in range(150)]
 
 # https://huggingface.co/datasets/monology/pile-uncopyrighted
+# VOLUME = "datasets"
+# DATASET_SAVE ="pile-uncopyrighted"
+# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-{MAX_TOKENS}"
+# TEXT_KEY = "text"
+# KEEP_KEYS = ["meta"]
+# files = [f"data-{i:05d}-of-01987.arrow" for i in range(200)]
+
+#https://huggingface.co/datasets/wikimedia/wikipedia/viewer/20231101.en
+# VOLUME = "datasets"
+# DATASET_SAVE ="wikipedia-en"
+# DATASET_SAVE_CHUNKED = f"wikipedia-en-chunked-{MAX_TOKENS}"
+# TEXT_KEY = "text"
+# KEEP_KEYS = ["id", "url", "title"]
+# files = [f"data-{i:05d}-of-00041.arrow" for i in range(41)]
+
 VOLUME = "datasets"
-DATASET_SAVE ="pile-uncopyrighted"
-DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-{MAX_TOKENS}"
-TEXT_KEY = "text"
-KEEP_KEYS = ["meta"]
-files = [f"data-{i:05d}-of-01987.arrow" for i in range(200)]
+DATASET_SAVE ="medrag-pubmed"
+DATASET_SAVE_CHUNKED = f"medrag-pubmed-{MAX_TOKENS}"
+TEXT_KEY = "content"
+KEEP_KEYS = ["id", "title", "PMID"]
+files = [f"data-{i:05d}-of-00138.arrow" for i in range(138)]
+
+
 
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"

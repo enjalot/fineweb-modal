@@ -15,8 +15,12 @@ VOLUME = "datasets"
 # DATASET_SAVE_CHUNKED = f"RedPajama-Data-V2-sample-10B-chunked-500"
 # files = [f"data-{i:05d}-of-00150.parquet" for i in range(150)]
 # DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-500"
-DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
-files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
+# DATASET_SAVE_CHUNKED = f"pile-uncopyrighted-chunked-120"
+# files = [f"data-{i:05d}-of-01987.parquet" for i in range(200)]
+DATASET_SAVE_CHUNKED = f"wikipedia-en-chunked-120"
+files = [f"data-{i:05d}-of-00041.parquet" for i in range(41)]
+
+
 
 
 # MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
