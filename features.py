@@ -14,22 +14,26 @@ DATASET_DIR="/embeddings"
 VOLUME = "embeddings"
 
 # DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4" 
-DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-120-all-MiniLM-L6-v2" 
-DIRECTORY = f"{DATASET_DIR}/RedPajama-Data-V2-sample-10B-chunked-120-all-MiniLM-L6-v2" 
-DIRECTORY = f"{DATASET_DIR}/pile-uncopyrighted-chunked-120-all-MiniLM-L6-v2" 
-# SAE = "64_32"
+# DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-120-all-MiniLM-L6-v2" 
+# DIRECTORY = f"{DATASET_DIR}/RedPajama-Data-V2-sample-10B-chunked-120-all-MiniLM-L6-v2" 
+# DIRECTORY = f"{DATASET_DIR}/pile-uncopyrighted-chunked-120-all-MiniLM-L6-v2" 
+DIRECTORY = f"{DATASET_DIR}/medrag-pubmed-500-nomic-embed-text-v1.5"
+FILES = [f"{DIRECTORY}/train/data-{i:05d}-of-00138.npy" for i in range(138)]
+SAE = "64_32"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-2"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}-3"
 # SAE = "64_128"
 # SAVE_DIRECTORY = f"{DATASET_DIR}/fineweb-edu-sample-10BT-chunked-500-HF4-{SAE}"
-SAE = "64_64"
+# SAE = "64_64"
+
 SAVE_DIRECTORY = f"{DIRECTORY}-{SAE}"
-D_IN = 384
 
 
-# MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-100BT"
-MODEL_ID = "enjalot/sae-all-MiniLM-L6-v2"
+# MODEL_ID = "enjalot/sae-all-MiniLM-L6-v2"
+# D_IN = 384
+MODEL_ID = "enjalot/sae-nomic-text-v1.5-FineWeb-edu-100BT"
 MODEL_DIR = "/model"
+D_IN = 768
 MODEL_REVISION="main"
 
 # We define our Modal Resources that we'll need
@@ -81,7 +85,7 @@ with st_image.imports():
 @app.cls(
     volumes={DATASET_DIR: volume}, 
     timeout=60 * 100,
-    container_idle_timeout=60 * 10,
+    scaledown_window=60 * 10,
     allow_concurrent_inputs=1,
     image=st_image,
 )
@@ -116,7 +120,7 @@ class SAEModel:
         # embeddings = df['embedding'].to_numpy()
         # print("converted to numpy")
         # embeddings = np.array([np.array(e).astype(np.float32) for e in embeddings])
-        # duration_s = (time.monotonic_ns() - start) / 1e9
+        duration_s = (time.monotonic_ns() - start) / 1e9
         # read the npy memmapped file
         size= os.path.getsize(file) // (D_IN * 4)
         embeddings = np.memmap(file, 
@@ -151,10 +155,9 @@ class SAEModel:
         #     df.drop(columns=['chunk_tokens'], inplace=True)
         print("features generated for", file)
 
-        file_name = file.split(".")[0]
+        file_name = os.path.basename(file).split(".")[0]
         output_dir = f"{SAVE_DIRECTORY}/train"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         print(f"saving to {output_dir}/{file_name}.parquet")
         df.to_parquet(f"{output_dir}/{file_name}.parquet")
 
@@ -164,12 +167,11 @@ class SAEModel:
 @app.local_entrypoint()
 def main():
 
-    files = [f"data-{i:05d}-of-00099.arrow" for i in range(99)]
     # files = files[0:10]
     
     model = SAEModel()
 
-    for resp in model.make_features.map(files, order_outputs=False, return_exceptions=True):
+    for resp in model.make_features.map(FILES, order_outputs=False, return_exceptions=True):
         if isinstance(resp, Exception):
             print(f"Exception: {resp}")
             continue
